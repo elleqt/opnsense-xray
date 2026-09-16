@@ -64,7 +64,7 @@
                             data-width="8em">{{ lang._('Nodes') }}</th>
 
                         <th data-column-id="commands"
-                            data-formatter="groupCommands"
+                            data-formatter="commands"
                             data-sortable="false"
                             data-width="10em">{{ lang._('') }}</th>
                     </tr>

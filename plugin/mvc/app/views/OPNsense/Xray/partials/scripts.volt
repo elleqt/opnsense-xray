@@ -95,7 +95,11 @@
             del:    '/api/xray/group/delGroup/',
             options: {
                 formatters: {
-                    groupCommands: function (column, row) {
+                    // NB: имя формата обязано быть 'commands' — UIBootgrid
+                    // перебивает своим рендерером колонку с этим id, и любое
+                    // другое имя формата молча игнорируется (проверено: кнопка
+                    // Refresh не появлялась вовсе).
+                    commands: function (column, row) {
                         var uuid = escAttr(row.uuid);
                         var html = '';
                         // Refresh only makes sense for imported groups
@@ -122,11 +126,13 @@
             set:    '/api/xray/group/setServer/',
             add:    '/api/xray/group/addServer',
             del:    '/api/xray/group/delServer/',
-            requestHandler: function (request) {
-                request['group'] = $('#serverGroupFilter').val() || '';
-                return request;
-            },
             options: {
+                // NB: requestHandler читается ТОЛЬКО из options (opnsense_bootgrid.js:310);
+                // на верхнем уровне он молча игнорируется, и грид отдаёт все серверы.
+                requestHandler: function (request) {
+                    request['group'] = $('#serverGroupFilter').val() || '';
+                    return request;
+                },
                 formatters: {
                     serverStale: function (column, row) {
                         return row.stale === '1'
