@@ -86,6 +86,169 @@
             }
         });
 
+        // ── Groups & servers CRUD tables (UIBootgrid) ───────────────
+        $('#grid-groups').UIBootgrid({
+            search: '/api/xray/group/searchGroup',
+            get:    '/api/xray/group/getGroup/',
+            set:    '/api/xray/group/setGroup/',
+            add:    '/api/xray/group/addGroup',
+            del:    '/api/xray/group/delGroup/',
+            options: {
+                formatters: {
+                    groupCommands: function (column, row) {
+                        var uuid = escAttr(row.uuid);
+                        var html = '';
+                        // Refresh only makes sense for imported groups
+                        if (row.source === 'subscription') {
+                            html += '<button type="button" class="btn btn-xs btn-default cmd-grp-refresh bootgrid-tooltip"'
+                                 +    ' data-row-id="' + uuid + '" title="{{ lang._("Re-fetch this subscription") }}">'
+                                 +    '<span class="fa fa-refresh fa-fw"></span></button> ';
+                        }
+                        return html
+                             + '<button type="button" class="btn btn-xs btn-default command-edit bootgrid-tooltip"'
+                             +   ' data-row-id="' + uuid + '" title="{{ lang._("Edit") }}">'
+                             +   '<span class="fa fa-pencil fa-fw"></span></button> '
+                             + '<button type="button" class="btn btn-xs btn-default command-delete bootgrid-tooltip"'
+                             +   ' data-row-id="' + uuid + '" title="{{ lang._("Delete") }}">'
+                             +   '<span class="fa fa-trash-o fa-fw"></span></button>';
+                    }
+                }
+            }
+        });
+
+        $('#grid-servers').UIBootgrid({
+            search: '/api/xray/group/searchServer',
+            get:    '/api/xray/group/getServer/',
+            set:    '/api/xray/group/setServer/',
+            add:    '/api/xray/group/addServer',
+            del:    '/api/xray/group/delServer/',
+            requestHandler: function (request) {
+                request['group'] = $('#serverGroupFilter').val() || '';
+                return request;
+            },
+            options: {
+                formatters: {
+                    serverStale: function (column, row) {
+                        return row.stale === '1'
+                            ? '<span class="label label-warning" style="font-size:11px;">{{ lang._("stale") }}</span>'
+                            : '<span style="font-size:11px;color:#999;">--</span>';
+                    }
+                }
+            }
+        });
+
+        // Group filter above the servers grid
+        $('#serverGroupFilter').on('change', function () {
+            $('#grid-servers').bootgrid('reload');
+        });
+
+        // Keep the filter options in sync with the groups grid
+        $('#grid-groups').on('loaded.rs.jquery.bootgrid', function () {
+            $.ajax({url: '/api/xray/group/searchGroup', type: 'GET', dataType: 'json'})
+                .done(function (data) {
+                    var $sel = $('#serverGroupFilter');
+                    var current = $sel.val();
+                    $sel.empty().append($('<option>').val('').text("{{ lang._('All groups') }}"));
+                    (data.rows || []).forEach(function (row) {
+                        $sel.append($('<option>').val(row.uuid).text(row.name));
+                    });
+                    if (current) {
+                        $sel.val(current);
+                    }
+                });
+        });
+
+        // ── Subscription import ─────────────────────────────────────
+        $('#btnSubImport').on('click', function () {
+            var $btn  = $(this);
+            var $res  = $('#subImportResult');
+            var name  = $.trim($('#subImportName').val());
+            var url   = $.trim($('#subImportUrl').val());
+            var ua    = $.trim($('#subImportUa').val());
+            var body  = $('#subImportBody').val() || '';
+
+            if (!name) {
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('Group name is required.') }}");
+                return;
+            }
+            if (!url && !$.trim(body)) {
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('Provide a subscription URL or paste the body.') }}");
+                return;
+            }
+
+            $btn.prop('disabled', true);
+            $res.removeClass('text-success text-danger').text("{{ lang._('Importing...') }}");
+
+            var payload = {name: name, sub_url: url, sub_ua: ua, body_b64: ''};
+            if ($.trim(body)) {
+                payload.body_b64 = btoa(unescape(encodeURIComponent(body)));
+            }
+
+            $.ajax({
+                url:         '/api/xray/group/importSubscription',
+                type:        'POST',
+                contentType: 'application/json; charset=utf-8',
+                data:        JSON.stringify(payload),
+                dataType:    'json'
+            }).done(function (data) {
+                $btn.prop('disabled', false);
+                if (data.status !== 'ok') {
+                    $res.removeClass('text-success').addClass('text-danger')
+                        .text("{{ lang._('Import failed:') }} " + (data.message || 'unknown error'));
+                    return;
+                }
+                var msg = "{{ lang._('Imported') }} " + data.added + " {{ lang._('nodes') }}";
+                if (data.skipped && data.skipped.length) {
+                    msg += ", " + data.skipped.length + " {{ lang._('skipped') }}: "
+                        + data.skipped.map(function (s) { return 'line ' + s.line + ': ' + s.reason; }).join('; ');
+                }
+                $res.removeClass('text-danger').addClass('text-success').text(msg);
+                $('#subImportBody').val('');
+                $('#grid-groups').bootgrid('reload');
+                $('#grid-servers').bootgrid('reload');
+            }).fail(function (xhr) {
+                $btn.prop('disabled', false);
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('HTTP error:') }} " + xhr.status);
+            });
+        });
+
+        // ── Refresh a subscription group ────────────────────────────
+        $(document).on('click', '#grid-groups .cmd-grp-refresh', function () {
+            var uuid = $(this).data('row-id');
+            var $btn = $(this).prop('disabled', true);
+            var $res = $('#subImportResult');
+            $res.removeClass('text-success text-danger').text("{{ lang._('Refreshing...') }}");
+
+            $.ajax({
+                url:      '/api/xray/group/refresh/' + uuid,
+                type:     'POST',
+                dataType: 'json'
+            }).done(function (data) {
+                $btn.prop('disabled', false);
+                if (data.status !== 'ok') {
+                    $res.removeClass('text-success').addClass('text-danger')
+                        .text("{{ lang._('Refresh failed:') }} " + (data.message || 'unknown error'));
+                    return;
+                }
+                var msg = 'added ' + data.added + ' / updated ' + data.updated
+                        + ' / removed ' + data.removed + ' / stale ' + data.stale;
+                if (data.skipped && data.skipped.length) {
+                    msg += ", " + data.skipped.length + " {{ lang._('skipped') }}: "
+                        + data.skipped.map(function (s) { return 'line ' + s.line + ': ' + s.reason; }).join('; ');
+                }
+                $res.removeClass('text-danger').addClass('text-success').text(msg);
+                $('#grid-groups').bootgrid('reload');
+                $('#grid-servers').bootgrid('reload');
+            }).fail(function (xhr) {
+                $btn.prop('disabled', false);
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('HTTP error:') }} " + xhr.status);
+            });
+        });
+
         // After grid loads/reloads data, fetch and overlay status
         $('#grid-instances').on('loaded.rs.jquery.bootgrid', function () {
             refreshInstancesStatus();

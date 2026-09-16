@@ -583,6 +583,11 @@ install -d /usr/local/opnsense/mvc/app/models/OPNsense/Xray
 install_tree "$PLUGIN_DIR/mvc/app/models/OPNsense/Xray" \
              "/usr/local/opnsense/mvc/app/models/OPNsense/Xray" 0644
 
+# MVC: shared library classes (VlessLink)
+install -d /usr/local/opnsense/mvc/app/library/OPNsense/Xray
+install_tree "$PLUGIN_DIR/mvc/app/library/OPNsense/Xray" \
+             "/usr/local/opnsense/mvc/app/library/OPNsense/Xray" 0644
+
 install -d /usr/local/opnsense/mvc/app/controllers/OPNsense/Xray
 install_tree "$PLUGIN_DIR/mvc/app/controllers/OPNsense/Xray" \
              "/usr/local/opnsense/mvc/app/controllers/OPNsense/Xray" 0644

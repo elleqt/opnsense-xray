@@ -20,8 +20,22 @@
         <id>instance.outbound_config</id>
         <label>Outbound Config (JSON)</label>
         <type>textbox</type>
-        <help>xray-core outbound object. Use "Import VLESS link" above to auto-fill, or paste/write the outbound JSON directly. The backend wraps it with SOCKS5 inbound and routing on save.</help>
+        <help>xray-core outbound object. Use "Import VLESS link" above to auto-fill, or paste/write the outbound JSON directly. The backend wraps it with SOCKS5 inbound and routing on save. Ignored when a Server is selected below.</help>
         <hint>{"tag":"proxy","protocol":"vless","settings":{...},"streamSettings":{...}}</hint>
+    </field>
+    <field>
+        <id>instance.group</id>
+        <label>Server Group</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>Group of servers to pick the active node from. Groups are managed on the Groups tab.</help>
+    </field>
+    <field>
+        <id>instance.server</id>
+        <label>Server</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>Active node. When set, its outbound config is used instead of the JSON above. Changing it rewrites config.json and restarts this instance only — firewall rules, gateway and the TUN interface are untouched.</help>
     </field>
 
     <field>

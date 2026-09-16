@@ -1,0 +1,46 @@
+<form>
+    <field>
+        <type>header</type>
+        <label>Server Group</label>
+    </field>
+    <field>
+        <id>group.name</id>
+        <label>Name</label>
+        <type>text</type>
+        <help>Display name for this group</help>
+        <hint>e.g. tuff, work, backup</hint>
+    </field>
+    <field>
+        <id>group.source</id>
+        <label>Source</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>manual: servers added by hand. subscription: servers imported from a URL; Refresh re-fetches them.</help>
+    </field>
+    <field>
+        <id>group.sub_url</id>
+        <label>Subscription URL</label>
+        <type>text</type>
+        <help>Subscription URL. Used by Refresh. Only a base64 or plain-text list of vless:// links is supported.</help>
+        <hint>https://example.org/sub/&lt;token&gt;</hint>
+    </field>
+    <field>
+        <id>group.sub_ua</id>
+        <label>Subscription User-Agent</label>
+        <type>text</type>
+        <help>User-Agent sent when fetching the subscription.</help>
+        <hint>Default: v2rayNG/1.9.5 — panels return different formats per User-Agent</hint>
+    </field>
+    <field>
+        <id>group.last_fetch</id>
+        <label>Last Fetch</label>
+        <type>text</type>
+        <help>Timestamp of the last successful fetch. Maintained automatically.</help>
+    </field>
+    <field>
+        <id>group.last_count</id>
+        <label>Last Node Count</label>
+        <type>text</type>
+        <help>Number of nodes seen in the last fetch. Maintained automatically.</help>
+    </field>
+</form>
