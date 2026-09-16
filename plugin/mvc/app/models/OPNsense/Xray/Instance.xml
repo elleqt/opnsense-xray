@@ -6,7 +6,8 @@
     <!-- Каждый инстанс получает уникальный UUID от OPNsense BaseModel. -->
     <!-- Миграция: install.sh конвертирует <instance> → <instances><instance uuid="...">, uuid → vless_uuid -->
     <!-- v3.1.0: поля group/server — выбор узла из группы серверов (OPNsense.Xray.Group) -->
-    <version>3.1.0</version>
+    <!-- v3.2.0: node_source — откуда берётся узел: своё JSON или сервер группы -->
+    <version>3.2.0</version>
     <items>
         <instance type="ArrayField">
             <enabled type="BooleanField">
@@ -17,6 +18,18 @@
                 <Default>default</Default>
                 <Required>N</Required>
             </name>
+            <!-- v3.2.0: режим выбора узла. config — своё JSON в outbound_config,
+                 group — сервер из группы. Пустое значение = наследие v3.1.0:
+                 узел берётся из server, если он заполнен. -->
+            <node_source type="OptionField">
+                <Default>config</Default>
+                <!-- Required=Y убирает пустой пункт из дропдауна: режим всегда один из двух -->
+                <Required>Y</Required>
+                <OptionValues>
+                    <config>Xray config (JSON)</config>
+                    <group>Server group</group>
+                </OptionValues>
+            </node_source>
             <outbound_config type="TextField">
                 <Required>N</Required>
                 <Default></Default>

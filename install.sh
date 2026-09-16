@@ -18,7 +18,7 @@
 set -e
 set -u
 
-PLUGIN_VERSION="3.1.0"
+PLUGIN_VERSION="3.2.0"
 PLUGIN_DIR="$(dirname "$0")/plugin"
 VERSION_FILE="/usr/local/opnsense/mvc/app/models/OPNsense/Xray/version.txt"
 
@@ -635,10 +635,19 @@ require_once("config.inc");
 $cfg = OPNsense\Core\Config::getInstance()->object();
 
 // v2.0.0: check new ArrayField structure first
+// v3.2.0 FIX: у 3.x полей server_address/vless_uuid нет вовсе — узел живёт в
+// outbound_config либо в выбранном сервере группы. Без этих двух проверок
+// установка поверх рабочей 3.x считала конфиг пустым и импортом заводила
+// ВТОРОЙ инстанс с тем же портом 10808 (замерено на 3.0.0 и 3.1.0).
 $instances = $cfg->OPNsense->xray->instances ?? null;
 if ($instances) {
     foreach ($instances->instance as $inst) {
-        if ((string)($inst->server_address ?? "") !== "" || (string)($inst->vless_uuid ?? "") !== "") {
+        if (
+            (string)($inst->server_address ?? "") !== "" ||
+            (string)($inst->vless_uuid ?? "") !== "" ||
+            trim((string)($inst->outbound_config ?? "")) !== "" ||
+            (string)($inst->server ?? "") !== ""
+        ) {
             echo "new";
             exit(0);
         }

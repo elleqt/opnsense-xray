@@ -452,7 +452,7 @@
 
             // Import panel — collapsible, injected before the form table
             var importHtml =
-                '<div style="margin: 0 0 10px;">' +
+                '<div id="dlgImportWrap" style="margin: 0 0 10px;">' +
                     '<a data-toggle="collapse" href="#dlgImportPanel" class="btn btn-sm btn-default" style="margin-bottom: 6px;">' +
                         '<i class="fa fa-upload"></i> {{ lang._("Import VLESS link") }}' +
                     '</a>' +
@@ -484,6 +484,60 @@
             var $footer = $(this).find('.modal-footer');
             $footer.prepend(validateHtml);
         });
+
+        // ── Node source: показываем ровно один способ задать узел ───
+        // 'Xray config (JSON)' -> поле outbound_config + панель Import VLESS link
+        // 'Server group'       -> поля Server Group / Server
+        // Селекторы через [id="…"]: у полей модели точка в id, и $('#instance.group')
+        // jQuery читает как id="instance" + класс "group".
+        var xrayServerGroup = {};   // server uuid -> group uuid
+
+        function xrayLoadServerGroups(then) {
+            $.ajax({url: '/api/xray/group/searchServer', type: 'GET', dataType: 'json'})
+                .done(function (data) {
+                    xrayServerGroup = {};
+                    (data.rows || []).forEach(function (row) {
+                        xrayServerGroup[row.uuid] = row.group;
+                    });
+                    if (then) then();
+                })
+                .fail(function () { if (then) then(); });
+        }
+
+        function xraySyncNodeSource() {
+            var $mode = $('[id="instance.node_source"]');
+            if (!$mode.length) return;
+            var useGroup = $mode.val() === 'group';
+
+            $('[id="instance.outbound_config"]').closest('tr').toggle(!useGroup);
+            $('#dlgImportWrap').toggle(!useGroup);
+            $('[id="instance.group"]').closest('tr').toggle(useGroup);
+            $('[id="instance.server"]').closest('tr').toggle(useGroup);
+
+            if (!useGroup) return;
+
+            // список Server ограничиваем выбранной группой
+            var gid = $('[id="instance.group"]').val() || '';
+            var $srv = $('[id="instance.server"]');
+            var current = $srv.val();
+            $srv.find('option').each(function () {
+                var v = $(this).val();
+                var mine = (v === '' || gid === '' || xrayServerGroup[v] === gid);
+                $(this).prop('disabled', !mine).toggle(mine);
+            });
+            if (current && gid && xrayServerGroup[current] !== gid) {
+                $srv.val('');
+            }
+            if ($srv.hasClass('selectpicker')) {
+                $srv.selectpicker('refresh');
+            }
+        }
+
+        $('#DialogInstance').on('shown.bs.modal', function () {
+            // значения полей приезжают асинхронно через get, поэтому с задержкой
+            xrayLoadServerGroups(function () { setTimeout(xraySyncNodeSource, 300); });
+        });
+        $(document).on('change', '[id="instance.node_source"], [id="instance.group"]', xraySyncNodeSource);
 
         // Import parse handler (inside dialog)
         $(document).on('click', '#dlgImportParseBtn', function () {

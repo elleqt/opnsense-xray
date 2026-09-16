@@ -11,14 +11,29 @@ class InstanceController extends ApiMutableModelControllerBase
 
     public function searchItemAction()
     {
-        $response = $this->searchBase('instance', ['enabled', 'name', 'outbound_config']);
+        $response = $this->searchBase('instance', ['enabled', 'name', 'outbound_config', 'node_source', 'server']);
         if (!empty($response['rows'])) {
+            // v3.2.0: в режиме group узел живёт в модели групп, а не в outbound_config
+            $servers = null;
             foreach ($response['rows'] as &$row) {
-                $ob    = json_decode($row['outbound_config'] ?? '', true);
+                $raw = $row['outbound_config'] ?? '';
+                $mode = (string)($row['node_source'] ?? '');
+                $server = (string)($row['server'] ?? '');
+                if ($server !== '' && $mode !== 'config') {
+                    if ($servers === null) {
+                        $servers = [];
+                        $groups = new \OPNsense\Xray\Group();
+                        foreach ($groups->server->iterateItems() as $uuid => $srv) {
+                            $servers[$uuid] = (string)$srv->outbound_config;
+                        }
+                    }
+                    $raw = $servers[$server] ?? '';
+                }
+                $ob    = json_decode($raw, true);
                 $vnext = $ob['settings']['vnext'][0] ?? [];
                 $row['server_address'] = $vnext['address'] ?? '';
                 $row['server_port']    = isset($vnext['port']) ? (string)$vnext['port'] : '';
-                unset($row['outbound_config']);
+                unset($row['outbound_config'], $row['node_source'], $row['server']);
             }
             unset($row);
         }

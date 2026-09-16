@@ -153,10 +153,12 @@ $xrayUptimeSecs = $instUuid !== '' ? proc_uptime(xray_pid_path($instUuid)) : nul
 $t2sUptimeSecs  = $instUuid !== '' ? proc_uptime(t2s_pid_path($instUuid))  : null;
 
 // ─── Ping RTT до VPN-сервера ─────────────────────────────────────────────────
-// v3.1.0: если у инстанса выбран сервер группы, адрес берётся из него.
+// v3.2.0: адрес берётся из сервера группы, если инстанс работает в режиме group
+// (или это конфиг от v3.1.0, где режима нет, но сервер выбран).
 $outboundJson = (string)($inst->outbound_config ?? '');
 $activeServer = (string)($inst->server ?? '');
-if ($activeServer !== '') {
+$nodeSource   = (string)($inst->node_source ?? '');
+if ($activeServer !== '' && $nodeSource !== 'config') {
     $groups = $cfg->OPNsense->xray->groups ?? null;
     if ($groups) {
         foreach ($groups->server as $srv) {
