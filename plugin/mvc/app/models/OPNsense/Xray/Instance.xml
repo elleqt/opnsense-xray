@@ -5,7 +5,9 @@
     <!-- v3.0.0: ArrayField multi-instance + vless_uuid rename (breaking change от v2.x) -->
     <!-- Каждый инстанс получает уникальный UUID от OPNsense BaseModel. -->
     <!-- Миграция: install.sh конвертирует <instance> → <instances><instance uuid="...">, uuid → vless_uuid -->
-    <version>3.0.0</version>
+    <!-- v3.1.0: поля group/server — выбор узла из группы серверов (OPNsense.Xray.Group) -->
+    <!-- v3.2.0: node_source — откуда берётся узел: своё JSON или сервер группы -->
+    <version>3.2.0</version>
     <items>
         <instance type="ArrayField">
             <enabled type="BooleanField">
@@ -16,10 +18,43 @@
                 <Default>default</Default>
                 <Required>N</Required>
             </name>
+            <!-- v3.2.0: режим выбора узла. config — своё JSON в outbound_config,
+                 group — сервер из группы. Пустое значение = наследие v3.1.0:
+                 узел берётся из server, если он заполнен. -->
+            <node_source type="OptionField">
+                <Default>config</Default>
+                <!-- Required=Y убирает пустой пункт из дропдауна: режим всегда один из двух -->
+                <Required>Y</Required>
+                <OptionValues>
+                    <config>Xray config (JSON)</config>
+                    <group>Server group</group>
+                </OptionValues>
+            </node_source>
             <outbound_config type="TextField">
                 <Required>N</Required>
                 <Default></Default>
             </outbound_config>
+            <!-- v3.1.0: выбор группы и активного сервера. Пусто => используется outbound_config. -->
+            <group type="ModelRelationField">
+                <Model>
+                    <groups>
+                        <source>OPNsense.Xray.Group</source>
+                        <items>group</items>
+                        <display>name</display>
+                    </groups>
+                </Model>
+                <Required>N</Required>
+            </group>
+            <server type="ModelRelationField">
+                <Model>
+                    <servers>
+                        <source>OPNsense.Xray.Group</source>
+                        <items>server</items>
+                        <display>name</display>
+                    </servers>
+                </Model>
+                <Required>N</Required>
+            </server>
             <!-- v1.0.3: socks5_listen — настраиваемый IP для SOCKS5 inbound -->
             <socks5_listen type="TextField">
                 <Default>127.0.0.1</Default>

@@ -66,6 +66,11 @@ function xray_parse_instance($inst, bool $globalEnabled): array
         'enabled'         => $globalEnabled && (string)($inst->enabled ?? '1') === '1',
         'name'            => (string)($inst->name             ?? 'default'),
         'outbound_config' => (string)($inst->outbound_config  ?? ''),
+        // v3.1.0: UUID выбранного сервера в группе.
+        'server'          => (string)($inst->server           ?? ''),
+        // v3.2.0: откуда берётся узел — 'config' | 'group'. Пусто = наследие
+        // v3.1.0: узел берётся из server, если он заполнен.
+        'node_source'     => (string)($inst->node_source      ?? ''),
         'socks5_listen'   => (string)($inst->socks5_listen    ?? '127.0.0.1') ?: '127.0.0.1',
         'socks5_port'     => (int)(string)($inst->socks5_port ?? 10808) ?: 10808,
         'tun_iface'       => (string)($inst->tun_interface    ?? 'proxytun2socks0'),
@@ -104,6 +109,57 @@ function xray_get_all_instances(): array
         $result[$inst_uuid] = $c;
     }
     return $result;
+}
+
+/**
+ * v3.1.0: возвращает outbound_config сервера из //OPNsense/xray/groups/server
+ * по его UUID, либо '' если сервер не найден.
+ */
+function xray_server_outbound(string $server_uuid): string
+{
+    if ($server_uuid === '') {
+        return '';
+    }
+    $cfg = OPNsense\Core\Config::getInstance()->object();
+    $grp = $cfg->OPNsense->xray->groups ?? null;
+    if (!$grp) {
+        return '';
+    }
+    foreach ($grp->server as $srv) {
+        if ((string)$srv['uuid'] === $server_uuid) {
+            return (string)($srv->outbound_config ?? '');
+        }
+    }
+    return '';
+}
+
+/**
+ * v3.2.0: единственная точка, решающая, откуда инстанс берёт узел.
+ *
+ *   node_source = 'group'  -> сервер группы (ошибка, если он пропал);
+ *   node_source = 'config' -> outbound_config инстанса;
+ *   пусто (конфиг от v3.1.0) -> сервер, если он выбран, иначе outbound_config.
+ *
+ * @return array{raw:string,error:string}
+ */
+function xray_active_outbound(array $c): array
+{
+    $mode   = (string)($c['node_source'] ?? '');
+    $server = (string)($c['server'] ?? '');
+    $useGroup = $mode === 'group' || ($mode === '' && $server !== '');
+
+    if ($useGroup) {
+        if ($server === '') {
+            return ['raw' => '', 'error' => 'node source is "group" but no server is selected'];
+        }
+        $raw = trim(xray_server_outbound($server));
+        if ($raw === '') {
+            return ['raw' => '', 'error' => "active server {$server} not found in groups"];
+        }
+        return ['raw' => $raw, 'error' => ''];
+    }
+
+    return ['raw' => trim((string)($c['outbound_config'] ?? '')), 'error' => ''];
 }
 
 /**
@@ -167,7 +223,12 @@ function xray_write_config(array $c): void
     $inst_uuid = $c['inst_uuid'];
     $confFile  = xray_conf_path($inst_uuid);
 
-    $raw = trim($c['outbound_config'] ?? '');
+    $active = xray_active_outbound($c);
+    if ($active['error'] !== '') {
+        echo "ERROR: {$active['error']}\n";
+        return;
+    }
+    $raw = $active['raw'];
     if ($raw === '') {
         echo "ERROR: outbound_config is empty\n";
         return;
@@ -648,7 +709,12 @@ switch ($action) {
         $tmpConf = $tmpBase . '.json';
         @unlink($tmpBase);
         try {
-            $raw = trim($c['outbound_config'] ?? '');
+            $active = xray_active_outbound($c);
+            if ($active['error'] !== '') {
+                echo "ERROR: {$active['error']}\n";
+                exit(1);
+            }
+            $raw = $active['raw'];
             if ($raw === '') {
                 echo "ERROR: outbound_config is empty\n";
                 exit(1);

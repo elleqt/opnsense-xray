@@ -1,0 +1,44 @@
+<form>
+    <field>
+        <type>header</type>
+        <label>Server</label>
+    </field>
+    <field>
+        <id>server.group</id>
+        <label>Group</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>Group this server belongs to</help>
+    </field>
+    <field>
+        <id>server.name</id>
+        <label>Name</label>
+        <type>text</type>
+        <help>Display name for this server</help>
+    </field>
+    <field>
+        <id>server.outbound_config</id>
+        <label>Outbound Config (JSON)</label>
+        <type>textbox</type>
+        <help>xray-core outbound object used when this server is the active node of an instance.</help>
+        <hint>{"tag":"proxy","protocol":"vless","settings":{...},"streamSettings":{...}}</hint>
+    </field>
+    <field>
+        <id>server.address</id>
+        <label>Address</label>
+        <type>text</type>
+        <help>Filled automatically on import; used for the grid and for matching on Refresh</help>
+    </field>
+    <field>
+        <id>server.port</id>
+        <label>Port</label>
+        <type>text</type>
+        <help>Filled automatically on import; used for the grid and for matching on Refresh</help>
+    </field>
+    <field>
+        <id>server.stale</id>
+        <label>Stale</label>
+        <type>checkbox</type>
+        <help>Set when the node disappeared from the subscription but is still selected by an instance</help>
+    </field>
+</form>

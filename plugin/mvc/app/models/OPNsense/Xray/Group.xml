@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<model>
+    <mount>//OPNsense/xray/groups</mount>
+    <description>Xray server groups</description>
+    <!-- v1.0.0: группы VLESS-серверов. Группа со source=subscription умеет Refresh. -->
+    <!-- Ни на одно поле имени НЕ ставить Mask: имена узлов подписки — эмодзи-флаги. -->
+    <version>1.0.0</version>
+    <items>
+        <group type="ArrayField">
+            <name type="TextField">
+                <Required>Y</Required>
+            </name>
+            <source type="OptionField">
+                <Default>manual</Default>
+                <OptionValues>
+                    <manual>manual</manual>
+                    <subscription>subscription</subscription>
+                </OptionValues>
+            </source>
+            <sub_url type="TextField">
+                <Required>N</Required>
+            </sub_url>
+            <sub_ua type="TextField">
+                <Default>v2rayNG/1.9.5</Default>
+                <Required>N</Required>
+            </sub_ua>
+            <last_fetch type="TextField">
+                <Required>N</Required>
+            </last_fetch>
+            <last_count type="TextField">
+                <Required>N</Required>
+            </last_count>
+        </group>
+        <server type="ArrayField">
+            <group type="ModelRelationField">
+                <Model>
+                    <groups>
+                        <source>OPNsense.Xray.Group</source>
+                        <items>group</items>
+                        <display>name</display>
+                    </groups>
+                </Model>
+                <Required>Y</Required>
+            </group>
+            <name type="TextField">
+                <Required>N</Required>
+            </name>
+            <outbound_config type="TextField">
+                <Required>Y</Required>
+            </outbound_config>
+            <address type="TextField">
+                <Required>N</Required>
+            </address>
+            <port type="TextField">
+                <Required>N</Required>
+            </port>
+            <node_key type="TextField">
+                <Required>N</Required>
+            </node_key>
+            <stale type="BooleanField">
+                <Default>0</Default>
+            </stale>
+        </server>
+    </items>
+</model>

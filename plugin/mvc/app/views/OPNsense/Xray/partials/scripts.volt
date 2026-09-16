@@ -86,6 +86,175 @@
             }
         });
 
+        // ── Groups & servers CRUD tables (UIBootgrid) ───────────────
+        $('#grid-groups').UIBootgrid({
+            search: '/api/xray/group/searchGroup',
+            get:    '/api/xray/group/getGroup/',
+            set:    '/api/xray/group/setGroup/',
+            add:    '/api/xray/group/addGroup',
+            del:    '/api/xray/group/delGroup/',
+            options: {
+                formatters: {
+                    // NB: имя формата обязано быть 'commands' — UIBootgrid
+                    // перебивает своим рендерером колонку с этим id, и любое
+                    // другое имя формата молча игнорируется (проверено: кнопка
+                    // Refresh не появлялась вовсе).
+                    commands: function (column, row) {
+                        var uuid = escAttr(row.uuid);
+                        var html = '';
+                        // Refresh only makes sense for imported groups
+                        if (row.source === 'subscription') {
+                            html += '<button type="button" class="btn btn-xs btn-default cmd-grp-refresh bootgrid-tooltip"'
+                                 +    ' data-row-id="' + uuid + '" title="{{ lang._("Re-fetch this subscription") }}">'
+                                 +    '<span class="fa fa-refresh fa-fw"></span></button> ';
+                        }
+                        return html
+                             + '<button type="button" class="btn btn-xs btn-default command-edit bootgrid-tooltip"'
+                             +   ' data-row-id="' + uuid + '" title="{{ lang._("Edit") }}">'
+                             +   '<span class="fa fa-pencil fa-fw"></span></button> '
+                             + '<button type="button" class="btn btn-xs btn-default command-delete bootgrid-tooltip"'
+                             +   ' data-row-id="' + uuid + '" title="{{ lang._("Delete") }}">'
+                             +   '<span class="fa fa-trash-o fa-fw"></span></button>';
+                    }
+                }
+            }
+        });
+
+        $('#grid-servers').UIBootgrid({
+            search: '/api/xray/group/searchServer',
+            get:    '/api/xray/group/getServer/',
+            set:    '/api/xray/group/setServer/',
+            add:    '/api/xray/group/addServer',
+            del:    '/api/xray/group/delServer/',
+            options: {
+                // NB: requestHandler читается ТОЛЬКО из options (opnsense_bootgrid.js:310);
+                // на верхнем уровне он молча игнорируется, и грид отдаёт все серверы.
+                requestHandler: function (request) {
+                    request['group'] = $('#serverGroupFilter').val() || '';
+                    return request;
+                },
+                formatters: {
+                    serverStale: function (column, row) {
+                        return row.stale === '1'
+                            ? '<span class="label label-warning" style="font-size:11px;">{{ lang._("stale") }}</span>'
+                            : '<span style="font-size:11px;color:#999;">--</span>';
+                    }
+                }
+            }
+        });
+
+        // Group filter above the servers grid
+        $('#serverGroupFilter').on('change', function () {
+            $('#grid-servers').bootgrid('reload');
+        });
+
+        // Keep the filter options in sync with the groups grid
+        $('#grid-groups').on('loaded.rs.jquery.bootgrid', function () {
+            $.ajax({url: '/api/xray/group/searchGroup', type: 'GET', dataType: 'json'})
+                .done(function (data) {
+                    var $sel = $('#serverGroupFilter');
+                    var current = $sel.val();
+                    $sel.empty().append($('<option>').val('').text("{{ lang._('All groups') }}"));
+                    (data.rows || []).forEach(function (row) {
+                        $sel.append($('<option>').val(row.uuid).text(row.name));
+                    });
+                    if (current) {
+                        $sel.val(current);
+                    }
+                });
+        });
+
+        // ── Subscription import ─────────────────────────────────────
+        $('#btnSubImport').on('click', function () {
+            var $btn  = $(this);
+            var $res  = $('#subImportResult');
+            var name  = $.trim($('#subImportName').val());
+            var url   = $.trim($('#subImportUrl').val());
+            var ua    = $.trim($('#subImportUa').val());
+            var body  = $('#subImportBody').val() || '';
+
+            if (!name) {
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('Group name is required.') }}");
+                return;
+            }
+            if (!url && !$.trim(body)) {
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('Provide a subscription URL or paste the body.') }}");
+                return;
+            }
+
+            $btn.prop('disabled', true);
+            $res.removeClass('text-success text-danger').text("{{ lang._('Importing...') }}");
+
+            var payload = {name: name, sub_url: url, sub_ua: ua, body_b64: ''};
+            if ($.trim(body)) {
+                payload.body_b64 = btoa(unescape(encodeURIComponent(body)));
+            }
+
+            $.ajax({
+                url:         '/api/xray/group/importSubscription',
+                type:        'POST',
+                contentType: 'application/json; charset=utf-8',
+                data:        JSON.stringify(payload),
+                dataType:    'json'
+            }).done(function (data) {
+                $btn.prop('disabled', false);
+                if (data.status !== 'ok') {
+                    $res.removeClass('text-success').addClass('text-danger')
+                        .text("{{ lang._('Import failed:') }} " + (data.message || 'unknown error'));
+                    return;
+                }
+                var msg = "{{ lang._('Imported') }} " + data.added + " {{ lang._('nodes') }}";
+                if (data.skipped && data.skipped.length) {
+                    msg += ", " + data.skipped.length + " {{ lang._('skipped') }}: "
+                        + data.skipped.map(function (s) { return 'line ' + s.line + ': ' + s.reason; }).join('; ');
+                }
+                $res.removeClass('text-danger').addClass('text-success').text(msg);
+                $('#subImportBody').val('');
+                $('#grid-groups').bootgrid('reload');
+                $('#grid-servers').bootgrid('reload');
+            }).fail(function (xhr) {
+                $btn.prop('disabled', false);
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('HTTP error:') }} " + xhr.status);
+            });
+        });
+
+        // ── Refresh a subscription group ────────────────────────────
+        $(document).on('click', '#grid-groups .cmd-grp-refresh', function () {
+            var uuid = $(this).data('row-id');
+            var $btn = $(this).prop('disabled', true);
+            var $res = $('#subImportResult');
+            $res.removeClass('text-success text-danger').text("{{ lang._('Refreshing...') }}");
+
+            $.ajax({
+                url:      '/api/xray/group/refresh/' + uuid,
+                type:     'POST',
+                dataType: 'json'
+            }).done(function (data) {
+                $btn.prop('disabled', false);
+                if (data.status !== 'ok') {
+                    $res.removeClass('text-success').addClass('text-danger')
+                        .text("{{ lang._('Refresh failed:') }} " + (data.message || 'unknown error'));
+                    return;
+                }
+                var msg = 'added ' + data.added + ' / updated ' + data.updated
+                        + ' / removed ' + data.removed + ' / stale ' + data.stale;
+                if (data.skipped && data.skipped.length) {
+                    msg += ", " + data.skipped.length + " {{ lang._('skipped') }}: "
+                        + data.skipped.map(function (s) { return 'line ' + s.line + ': ' + s.reason; }).join('; ');
+                }
+                $res.removeClass('text-danger').addClass('text-success').text(msg);
+                $('#grid-groups').bootgrid('reload');
+                $('#grid-servers').bootgrid('reload');
+            }).fail(function (xhr) {
+                $btn.prop('disabled', false);
+                $res.removeClass('text-success').addClass('text-danger')
+                    .text("{{ lang._('HTTP error:') }} " + xhr.status);
+            });
+        });
+
         // After grid loads/reloads data, fetch and overlay status
         $('#grid-instances').on('loaded.rs.jquery.bootgrid', function () {
             refreshInstancesStatus();
@@ -283,7 +452,7 @@
 
             // Import panel — collapsible, injected before the form table
             var importHtml =
-                '<div style="margin: 0 0 10px;">' +
+                '<div id="dlgImportWrap" style="margin: 0 0 10px;">' +
                     '<a data-toggle="collapse" href="#dlgImportPanel" class="btn btn-sm btn-default" style="margin-bottom: 6px;">' +
                         '<i class="fa fa-upload"></i> {{ lang._("Import VLESS link") }}' +
                     '</a>' +
@@ -315,6 +484,67 @@
             var $footer = $(this).find('.modal-footer');
             $footer.prepend(validateHtml);
         });
+
+        // ── Node source: показываем ровно один способ задать узел ───
+        // 'Xray config (JSON)' -> поле outbound_config + панель Import VLESS link
+        // 'Server group'       -> поля Server Group / Server
+        // Селекторы через [id="…"]: у полей модели точка в id, и $('#instance.group')
+        // jQuery читает как id="instance" + класс "group".
+        var xrayServerGroup = {};   // server uuid -> group uuid
+
+        function xrayLoadServerGroups(then) {
+            $.ajax({url: '/api/xray/group/searchServer', type: 'GET', dataType: 'json'})
+                .done(function (data) {
+                    xrayServerGroup = {};
+                    (data.rows || []).forEach(function (row) {
+                        xrayServerGroup[row.uuid] = row.group;
+                    });
+                    if (then) then();
+                })
+                .fail(function () { if (then) then(); });
+        }
+
+        function xraySyncNodeSource() {
+            var $mode = $('[id="instance.node_source"]');
+            if (!$mode.length) return;
+            var useGroup = $mode.val() === 'group';
+
+            $('[id="instance.outbound_config"]').closest('tr').toggle(!useGroup);
+            $('#dlgImportWrap').toggle(!useGroup);
+            $('[id="instance.group"]').closest('tr').toggle(useGroup);
+            $('[id="instance.server"]').closest('tr').toggle(useGroup);
+
+            if (!useGroup) return;
+
+            // Список Server ограничиваем выбранной группой, но выбранный сейчас
+            // узел показываем всегда: иначе открытие диалога молча снимало бы
+            // выбор (узел вне группы, группа удалена, или карта не загрузилась),
+            // и следующий Save записал бы пустой server, вернув инстанс на JSON.
+            var gid = $('[id="instance.group"]').val() || '';
+            var $srv = $('[id="instance.server"]');
+            var current = $srv.val();
+            var mapped = !$.isEmptyObject(xrayServerGroup);
+            $srv.find('option').each(function () {
+                var v = $(this).val();
+                var mine = (v === '' || v === current || gid === '' || !mapped
+                            || xrayServerGroup[v] === gid);
+                $(this).prop('disabled', !mine).toggle(mine);
+            });
+            // Снимаем выбор только когда точно знаем, что узел из другой группы.
+            if (current && gid && mapped && xrayServerGroup[current] !== undefined
+                && xrayServerGroup[current] !== gid) {
+                $srv.val('');
+            }
+            if ($srv.hasClass('selectpicker')) {
+                $srv.selectpicker('refresh');
+            }
+        }
+
+        $('#DialogInstance').on('shown.bs.modal', function () {
+            // значения полей приезжают асинхронно через get, поэтому с задержкой
+            xrayLoadServerGroups(function () { setTimeout(xraySyncNodeSource, 300); });
+        });
+        $(document).on('change', '[id="instance.node_source"], [id="instance.group"]', xraySyncNodeSource);
 
         // Import parse handler (inside dialog)
         $(document).on('click', '#dlgImportParseBtn', function () {

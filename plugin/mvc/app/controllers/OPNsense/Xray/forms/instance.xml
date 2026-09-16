@@ -17,11 +17,32 @@
         <hint>e.g. default, work, streaming</hint>
     </field>
     <field>
+        <id>instance.node_source</id>
+        <label>Node Source</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>Where this instance takes its node from. "Xray config (JSON)" — the outbound JSON below (paste it or fill it from a VLESS link). "Server group" — one server of a group managed on the Groups tab; the JSON field is then unused.</help>
+    </field>
+    <field>
         <id>instance.outbound_config</id>
         <label>Outbound Config (JSON)</label>
         <type>textbox</type>
         <help>xray-core outbound object. Use "Import VLESS link" above to auto-fill, or paste/write the outbound JSON directly. The backend wraps it with SOCKS5 inbound and routing on save.</help>
         <hint>{"tag":"proxy","protocol":"vless","settings":{...},"streamSettings":{...}}</hint>
+    </field>
+    <field>
+        <id>instance.group</id>
+        <label>Server Group</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>Group to pick the active node from. Groups and their servers are managed on the Groups tab.</help>
+    </field>
+    <field>
+        <id>instance.server</id>
+        <label>Server</label>
+        <type>dropdown</type>
+        <style>selectpicker</style>
+        <help>Active node, one of the selected group. Changing it rewrites config.json and restarts this instance only — firewall rules, gateway, NAT and the TUN interface are untouched.</help>
     </field>
 
     <field>
