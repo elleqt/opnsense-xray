@@ -8,14 +8,39 @@
 [![OPNsense](https://img.shields.io/badge/OPNsense-25.x%20%2F%2026.x-blue)](https://opnsense.org)
 [![FreeBSD](https://img.shields.io/badge/FreeBSD-14.x%20amd64-red)](https://freebsd.org)
 
-**Xray-core VPN plugin for OPNsense** — v3.0.1
+**Xray-core VPN plugin for OPNsense** — v3.2.0 (fork of [MrTheory/os-xray](https://github.com/MrTheory/os-xray), see [what differs](#fork-what-differs-from-upstream))
 
 Xray-core + tun2socks — native VPN client for OPNsense with selective routing support. VLESS+Reality via wizard or custom config.json (any protocol/transport). Bypasses DPI blocking by disguising traffic as legitimate TLS.
 
 ---
 
+## Fork: what differs from upstream
+
+This is a fork of [MrTheory/os-xray](https://github.com/MrTheory/os-xray) (branch `develop`). Everything upstream does still works the same way; the fork adds one feature and fixes what that feature uncovered.
+
+**Added — server groups with subscription import.** An instance no longer carries its node inline only: it can point at a **group** and one **active server** in it, so changing the exit node is a dropdown choice plus Apply instead of editing outbound JSON. A group created from a subscription URL gets a **Refresh** button that re-fetches the list on demand.
+
+- New model `OPNsense\Xray\Group` (`//OPNsense/xray/groups`) with two ArrayFields, `group` and `server`, plus a `Groups` tab holding both grids and the import panel.
+- New API `api/xray/group/*`: CRUD for groups and servers, `importSubscription`, `refresh`. Own ACL entry, no new configd actions.
+- New instance fields `node_source`, `group`, `server`. **`node_source` makes the two ways of defining a node mutually exclusive in the dialog**: `Xray config (JSON)` shows the outbound JSON and the Import VLESS link panel, `Server group` shows the group and server pickers instead.
+- `xray_active_outbound()` in `xray-service-control.php` is the single place deciding where a node comes from; the instances grid and `xray-ifstats.php` resolve it the same way, so the `Server` column and the Diagnostics ping follow the active node.
+- The `vless://` parser moved from `ImportController` into a shared `OPNsense\Xray\VlessLink` class, so single-link and subscription import cannot drift apart.
+
+**Deliberately not added.** No subscription auto-refresh (no cron, no timer, no fetch on Apply) and no automatic node selection (no balancer, observatory, `leastPing` or fallback). The active node is chosen by a human, and Refresh never restarts the service nor changes an instance's active server — a node that disappeared from the subscription while being used is kept and flagged `stale` instead of being deleted.
+
+**Fixed along the way.**
+
+- `install.sh` imported a **second instance** when run on top of a working 3.x setup: its "config already present" probe looked for the v1/v2 fields `server_address`/`vless_uuid`, which 3.x does not have, so it fell through to the import path and created a duplicate instance bound to the same SOCKS port. It now also checks `outbound_config` and `server`.
+- A custom row-command formatter is ignored on OPNsense 26.7 unless it is named `commands` — the grid shim renders that column with its own formatter, so a differently named one is silently dropped.
+- `requestHandler` is only read from `options`; passed at the top level of a `UIBootgrid` call it is ignored.
+
+**Compatibility.** Existing configurations keep working untouched: the new fields are empty, and an empty `node_source` reproduces the previous behaviour of preferring a selected server. `outbound_config` stays a first-class way to define a node, not a deprecated one. Model versions are bumped so the schema is re-read; no migration class is needed. Going back to upstream is not just reinstalling the plugin — `//OPNsense/xray/groups` and the new instance fields have to be removed from `config.xml` by hand.
+
+
 ## Features
 
+- **Server groups + subscription import** — import a list of `vless://` links as a group, then pick the active node from a dropdown; **Refresh** re-fetches the list on demand (no auto-refresh, no automatic node selection)
+- **Node Source switch** — an instance takes its node either from its own config JSON or from a group server; the dialog shows only the fields of the chosen mode
 - **Multi-instance support** — add, edit and delete multiple VPN instances from a bootgrid table
 - **Per-instance status badges** — each instance row shows xray/tun2socks up/down status, auto-refreshed every 5 seconds
 - **Custom Config** — two modes: Wizard (VLESS+Reality via GUI fields) or Custom (any xray-core config.json for any protocol and transport)
