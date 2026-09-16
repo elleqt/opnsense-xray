@@ -516,16 +516,23 @@
 
             if (!useGroup) return;
 
-            // список Server ограничиваем выбранной группой
+            // Список Server ограничиваем выбранной группой, но выбранный сейчас
+            // узел показываем всегда: иначе открытие диалога молча снимало бы
+            // выбор (узел вне группы, группа удалена, или карта не загрузилась),
+            // и следующий Save записал бы пустой server, вернув инстанс на JSON.
             var gid = $('[id="instance.group"]').val() || '';
             var $srv = $('[id="instance.server"]');
             var current = $srv.val();
+            var mapped = !$.isEmptyObject(xrayServerGroup);
             $srv.find('option').each(function () {
                 var v = $(this).val();
-                var mine = (v === '' || gid === '' || xrayServerGroup[v] === gid);
+                var mine = (v === '' || v === current || gid === '' || !mapped
+                            || xrayServerGroup[v] === gid);
                 $(this).prop('disabled', !mine).toggle(mine);
             });
-            if (current && gid && xrayServerGroup[current] !== gid) {
+            // Снимаем выбор только когда точно знаем, что узел из другой группы.
+            if (current && gid && mapped && xrayServerGroup[current] !== undefined
+                && xrayServerGroup[current] !== gid) {
                 $srv.val('');
             }
             if ($srv.hasClass('selectpicker')) {
