@@ -5,6 +5,14 @@ Format: [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [3.2.1] — 2026-09-23 (fork)
+
+### Fixed
+- **Логи xray-core и tun2socks пропадали после первой ротации.** `proc_start()` и путь загрузки в `plugins.inc.d/xray.inc` запускали `daemon(8)` через shell-редирект `>> log`: файл открывался один раз, newsyslog (`JG`, без сигнала) переименовывал и сжимал его, и вывод уходил в удалённый inode. Замерено 2026-09-23: у демонов обоих инстансов fd 1/2 указывали на удалённые файлы, лог общего инстанса не обновлялся с 2026-09-22 15:24. Теперь `daemon -H -o <log> -P /var/run/xray-daemon-<pidfile>`; newsyslog с флагом `R` вызывает новый `xray-log-reopen.sh`, который шлёт SIGHUP только супервизорам с таким pidfile. Путь загрузки пишет в лог своего инстанса, а не в общий `/var/log/xray-core.log`.
+- **tun2socks 2.7 не запускался с `-config`** — нужен `--config`, в `proc_start` и в `plugins.inc.d/xray.inc`. На роутере это жило локальным патчем с 2026-09-16.
+
+---
+
 ## [3.2.0] — 2026-09-16 (fork)
 
 Форк `elleqt/opnsense-xray`. Отличия от апстрима собраны в README, раздел

@@ -18,7 +18,7 @@
 set -e
 set -u
 
-PLUGIN_VERSION="3.2.0"
+PLUGIN_VERSION="3.2.1"
 PLUGIN_DIR="$(dirname "$0")/plugin"
 VERSION_FILE="/usr/local/opnsense/mvc/app/models/OPNsense/Xray/version.txt"
 
@@ -50,6 +50,7 @@ if [ "${1:-}" = "uninstall" ]; then
     rm -f  /usr/local/opnsense/scripts/Xray/xray-testconnect.php
     rm -f  /usr/local/opnsense/scripts/Xray/xray-watchdog.php
     rm -f  /usr/local/opnsense/scripts/Xray/xray-ifstats.php
+    rm -f  /usr/local/opnsense/scripts/Xray/xray-log-reopen.sh
     rmdir  /usr/local/opnsense/scripts/Xray 2>/dev/null || true
     # BUG-11: удаляем конфиг ротации логов newsyslog
     rm -f  /etc/newsyslog.conf.d/xray.conf

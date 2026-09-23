@@ -8,7 +8,7 @@
 [![OPNsense](https://img.shields.io/badge/OPNsense-25.x%20%2F%2026.x-blue)](https://opnsense.org)
 [![FreeBSD](https://img.shields.io/badge/FreeBSD-14.x%20amd64-red)](https://freebsd.org)
 
-**Xray-core VPN plugin for OPNsense** — v3.2.0 (fork of [MrTheory/os-xray](https://github.com/MrTheory/os-xray), see [what differs](#fork-what-differs-from-upstream))
+**Xray-core VPN plugin for OPNsense** — v3.2.1 (fork of [MrTheory/os-xray](https://github.com/MrTheory/os-xray), see [what differs](#fork-what-differs-from-upstream))
 
 Xray-core + tun2socks — native VPN client for OPNsense with selective routing support. VLESS+Reality via wizard or custom config.json (any protocol/transport). Bypasses DPI blocking by disguising traffic as legitimate TLS.
 
@@ -33,6 +33,8 @@ This is a fork of [MrTheory/os-xray](https://github.com/MrTheory/os-xray) (branc
 - `install.sh` imported a **second instance** when run on top of a working 3.x setup: its "config already present" probe looked for the v1/v2 fields `server_address`/`vless_uuid`, which 3.x does not have, so it fell through to the import path and created a duplicate instance bound to the same SOCKS port. It now also checks `outbound_config` and `server`.
 - A custom row-command formatter is ignored on OPNsense 26.7 unless it is named `commands` — the grid shim renders that column with its own formatter, so a differently named one is silently dropped.
 - `requestHandler` is only read from `options`; passed at the top level of a `UIBootgrid` call it is ignored.
+- **xray-core and tun2socks logs vanished after the first rotation.** The daemons were started with a shell redirect `>> log`, so the file was opened once; newsyslog renamed and compressed it without a signal, and output kept going to the deleted inode. `daemon(8)` now owns the log (`-H -o`), and after rotation `xray-log-reopen.sh` sends SIGHUP to its supervisor (`-P /var/run/xray-daemon-*.pid`). The boot path (`plugins.inc.d/xray.inc`) now writes to the instance's own log instead of the shared `/var/log/xray-core.log`.
+- tun2socks 2.7 only accepts `--config` (two dashes), not `-config`.
 
 **Compatibility.** Existing configurations keep working untouched: the new fields are empty, and an empty `node_source` reproduces the previous behaviour of preferring a selected server. `outbound_config` stays a first-class way to define a node, not a deprecated one. Model versions are bumped so the schema is re-read; no migration class is needed. Going back to upstream is not just reinstalling the plugin — `//OPNsense/xray/groups` and the new instance fields have to be removed from `config.xml` by hand.
 

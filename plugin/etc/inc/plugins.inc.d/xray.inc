@@ -34,7 +34,6 @@ function xray_configure_do(bool $verbose = false): void
 
     $xrayBin  = '/usr/local/bin/xray-core';
     $t2sBin   = '/usr/local/tun2socks/tun2socks';
-    $daemonLog = '/var/log/xray-core.log';
 
     if (!file_exists($xrayBin) || !file_exists($t2sBin)) {
         return;
@@ -88,18 +87,25 @@ function xray_configure_do(bool $verbose = false): void
                         echo "xray [{$inst_uuid}]: starting xray-core and tun2socks...\n";
                     }
 
-                    $log = escapeshellarg($daemonLog);
-                    exec('/usr/sbin/daemon -p ' . escapeshellarg($xrayPid)
+                    // Как proc_start() в xray-service-control.php: лог инстанса
+                    // держит daemon(8) (-o), по SIGHUP после ротации открывает
+                    // его заново (-H), pidfile супервизора (-P) нужен для этого SIGHUP.
+                    $log = escapeshellarg("/var/log/xray-core-{$inst_uuid}.log");
+                    exec('/usr/sbin/daemon -H -o ' . $log
+                        . ' -P ' . escapeshellarg('/var/run/xray-daemon-' . basename($xrayPid))
+                        . ' -p ' . escapeshellarg($xrayPid)
                         . ' ' . escapeshellarg($xrayBin)
                         . ' run -c ' . escapeshellarg($xrayConf)
-                        . ' >> ' . $log . ' 2>&1 &');
+                        . ' > /dev/null 2>&1 &');
 
                     sleep(1);
 
-                    exec('/usr/sbin/daemon -p ' . escapeshellarg($t2sPid)
+                    exec('/usr/sbin/daemon -H -o ' . $log
+                        . ' -P ' . escapeshellarg('/var/run/xray-daemon-' . basename($t2sPid))
+                        . ' -p ' . escapeshellarg($t2sPid)
                         . ' ' . escapeshellarg($t2sBin)
-                        . ' -config ' . escapeshellarg($t2sConf)
-                        . ' >> ' . $log . ' 2>&1 &');
+                        . ' --config ' . escapeshellarg($t2sConf)
+                        . ' > /dev/null 2>&1 &');
 
                     // Ждём TUN до 5 секунд
                     $rc = 1;

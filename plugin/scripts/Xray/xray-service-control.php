@@ -317,12 +317,26 @@ function proc_kill(string $pidfile): void
     @unlink($pidfile);
 }
 
+// Pidfile супервизора daemon(8). По этим файлам xray-log-reopen.sh после
+// ротации шлёт SIGHUP — только демонам, запущенным с -H.
+function daemon_sup_pid_path(string $pidfile): string
+{
+    return '/var/run/xray-daemon-' . basename($pidfile);
+}
+
 function proc_start(string $bin, string $args, string $pidfile, string $logfile = ''): void
 {
-    // BUG-7 FIX: stderr демона → XRAY_DAEMON_LOG вместо /dev/null
-    $log = escapeshellarg($logfile !== '' ? $logfile : XRAY_DAEMON_LOG);
-    exec('/usr/sbin/daemon -p ' . escapeshellarg($pidfile)
-       . ' ' . escapeshellarg($bin) . ' ' . $args . ' >> ' . $log . ' 2>&1 &');
+    // Лог держит сам daemon(8): -o пишет вывод процесса в файл, -H по SIGHUP
+    // закрывает его и открывает заново (SIGHUP шлёт xray-log-reopen.sh из
+    // newsyslog, см. etc/newsyslog.conf.d/xray.conf). Прежний shell-редирект
+    // `>> log` открывал файл один раз: после ротации демон писал в удалённый
+    // inode, и лог молча пропадал. Свой stdout daemon отдаёт в /dev/null,
+    // иначе exec() ждал бы закрытия пайпа.
+    $log = $logfile !== '' ? $logfile : XRAY_DAEMON_LOG;
+    exec('/usr/sbin/daemon -H -o ' . escapeshellarg($log)
+       . ' -P ' . escapeshellarg(daemon_sup_pid_path($pidfile))
+       . ' -p ' . escapeshellarg($pidfile)
+       . ' ' . escapeshellarg($bin) . ' ' . $args . ' > /dev/null 2>&1 &');
 }
 
 // ─── Per-instance lock helpers ────────────────────────────────────────────────
@@ -505,7 +519,7 @@ function do_start(array $c): bool
             usleep(800000);
         }
         if (!proc_is_running(t2s_pid_path($inst_uuid))) {
-            proc_start(T2S_BIN, '-config ' . escapeshellarg(t2s_conf_path($inst_uuid)), t2s_pid_path($inst_uuid), $instLog);
+            proc_start(T2S_BIN, '--config ' . escapeshellarg(t2s_conf_path($inst_uuid)), t2s_pid_path($inst_uuid), $instLog);
             usleep(800000);
         }
 
